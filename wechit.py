@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 import time
 from PIL import Image, ImageOps, ImageStat, ImageEnhance
 import os
@@ -16,18 +16,28 @@ IS_PYTHON3 = sys.version_info > (3, 0)        # supports python 2 and 3
 
 LOGIN_SCREEN_FILE = "./temp/login-screen.png" # temp file for qr code
 MSG_IMG_FILE = "./temp/msg-img.png"           # temp file for in-chat images
-IS_RETINA = True                              # mac with a retina display?
+IS_RETINA = False                              # mac with a retina display?
+
+# Browser version
+BROWSER_VERSION = 118
 
 # terminal window dimensions
 TERM_ROWS = 24
 TERM_COLUMNS = 80
 
 # chrome driver settings
-chrome_options = Options()
-chrome_options.add_argument("--headless")
-chrome_options.add_argument("safebrowsing-disable-extension-blacklist")
-chrome_options.add_argument("--safebrowsing-disable-download-protection")
-chrome_options.add_experimental_option("prefs", {'safebrowsing.enabled': 'false'})
+chrome_options = webdriver.FirefoxOptions()
+# chrome_options.browser_version = BROWSER_VERSION
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--disable-gpu')
+chrome_options.add_argument('--disable-dev-shm-usage')
+chrome_options.add_argument("--disable-extensions")
+chrome_options.add_argument("--window-size=1920,1080")
+# chrome_options.add_argument('--user-data-dir=~/.config/google-chrome')
+# chrome_options.add_argument("safebrowsing-disable-extension-blacklist")
+# chrome_options.add_argument("--safebrowsing-disable-download-protection")
+# chrome_options.add_experimental_option("prefs", {'safebrowsing.enabled': 'false'})
 
 if IS_PYTHON3:
     unicode = str # in python 3, unicode and str are unified
@@ -66,8 +76,8 @@ def print_splash_screen():
     return result
 
 # initialize chrome driver and navigate to "WeChat for Web"
-def init_driver(path=os.path.join(os.getcwd(),"chromedriver")):
-    driver = webdriver.Chrome(chrome_options=chrome_options, executable_path=path)
+def init_driver():
+    driver = webdriver.Firefox(options=chrome_options)
     driver.get("https://web.wechat.com")
     return driver
 
@@ -207,7 +217,7 @@ def get_qr_code(driver):
     print("retrieving qr code...")
     driver.get_screenshot_as_file(LOGIN_SCREEN_FILE)
 
-    qrelem = driver.find_element_by_class_name("qrcode").find_element_by_class_name("img")
+    qrelem = driver.find_element(By.CLASS_NAME, "qrcode").find_element(By.CLASS_NAME, "img")
 
     rect = get_rect(qrelem)
 
@@ -286,7 +296,7 @@ def send_enter(elem):
 # get my own username
 def get_username(driver):
     return render_unicode(no_emoji(
-        driver.find_element_by_class_name("give_me").find_element_by_class_name("display_name").get_attribute("innerHTML")
+        driver.find_element(By.CLASS_NAME, "give_me").find_element(By.CLASS_NAME, "display_name").get_attribute("innerHTML")
         ))
 
 # get a list of recent conversation partners
@@ -305,19 +315,19 @@ def list_conversations(driver):
 # start a conversation with someone
 # (immplementation: search their name in the search bar and press enter)
 def goto_conversation(driver, name="File Transfer"):
-    search = driver.find_element_by_id("search_bar").find_element_by_class_name("frm_search")
+    search = driver.find_element_by_id("search_bar").find_element(By.CLASS_NAME, "frm_search")
     search.send_keys(name)
     send_enter(search)
 
-    return driver.find_element_by_id("chatArea").find_element_by_class_name("title_name").get_attribute("innerHTML")
+    return driver.find_element_by_id("chatArea").find_element(By.CLASS_NAME, "title_name").get_attribute("innerHTML")
 
 # get a list of recent messages with current friend
 def list_messages(driver):
-    elems = driver.find_element_by_id("chatArea").find_element_by_class_name("chat_bd").find_elements_by_class_name("message")
+    elems = driver.find_element_by_id("chatArea").find_element(By.CLASS_NAME, "chat_bd").find_elements_by_class_name("message")
     msgs = []
     for e in elems:
         try:
-            author = render_unicode(no_emoji(e.find_element_by_class_name("avatar").get_attribute("title")))
+            author = render_unicode(no_emoji(e.find_element(By.CLASS_NAME, "avatar").get_attribute("title")))
             content = e.find_elements_by_class_name("content")[-1]
         except:
             continue
@@ -359,15 +369,15 @@ def print_messages(msgs, my_name="", cols=80):
 
 # send plain text message to current friend
 def send_message(driver, msg="Hello there!"):
-    field = driver.find_element_by_class_name("box_ft").find_element_by_id("editArea")
+    field = driver.find_element(By.CLASS_NAME, "box_ft").find_element_by_id("editArea")
     field.send_keys(unrender_unicode(msg))
     send_enter(field)
 
 # send file to current friend by full path
 def upload_file(driver,file_path):
-    btn = driver.find_element_by_class_name("box_ft").find_element_by_class_name("js_fileupload")
+    btn = driver.find_element(By.CLASS_NAME, "box_ft").find_element(By.CLASS_NAME, "js_fileupload")
     try:
-        inp = btn.find_element_by_class_name("webuploader-element-invisible")
+        inp = btn.find_element(By.CLASS_NAME, "webuploader-element-invisible")
         inp.send_keys(file_path)
         return True
     except:
@@ -376,7 +386,7 @@ def upload_file(driver,file_path):
 # download all the recent files
 # chromedriver seems to bug out in this when in headless mode
 def download_files(driver):
-    elems = driver.find_element_by_id("chatArea").find_element_by_class_name("chat_bd").find_elements_by_class_name("message")
+    elems = driver.find_element_by_id("chatArea").find_element(By.CLASS_NAME, "chat_bd").find_elements_by_class_name("message")
     for e in elems:
         try:
             content = e.find_elements_by_class_name("content")[-1]
@@ -393,8 +403,8 @@ def download_files(driver):
                     while True:
                         try:
                             time.sleep(0.1)
-                            close_btn = driver.find_element_by_class_name("J_Preview").find_element_by_class_name("img_preview_close")
-                            down_btn = driver.find_element_by_class_name("J_Preview").find_elements_by_class_name("img_opr_item")[1]
+                            close_btn = driver.find_element(By.CLASS_NAME, "J_Preview").find_element(By.CLASS_NAME, "img_preview_close")
+                            down_btn = driver.find_element(By.CLASS_NAME, "J_Preview").find_elements_by_class_name("img_opr_item")[1]
                             if not down_clicked:
                                 down_btn.click()
                                 down_clicked = True
@@ -408,7 +418,7 @@ def download_files(driver):
                 if len(atts) > 0:
                     while True:
                         try:
-                            atts[0].find_element_by_class_name("opr").find_element_by_class_name("ng-scope").click()
+                            atts[0].find_element(By.CLASS_NAME, "opr").find_element(By.CLASS_NAME, "ng-scope").click()
                             print("generic attachment download initiated.")
                             break
                         except:
